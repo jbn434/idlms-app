@@ -1,0 +1,51 @@
+name: Deploy Node App via Podman
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Set up Podman
+      run: |
+        sudo apt update
+        sudo apt install -y podman
+
+    - name: Build Podman Image
+      run: |
+        podman build -t idlms-app .
+
+    - name: Save Podman Image as Archive
+      run: |
+        podman save -o idlms-app.tar localhost/idlms-app
+
+    - name: Copy Image to Remote Server
+      env:
+        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+        REMOTE_USER: ${{ secrets.REMOTE_USER }}
+      run: |
+        echo "$SSH_PRIVATE_KEY" > key.pem
+        chmod 600 key.pem
+        scp -i key.pem idlms-app.tar $REMOTE_USER@$REMOTE_HOST:/tmp/idlms-app.tar
+
+    - name: Load and Run Image on Remote Server
+      env:
+        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+        REMOTE_USER: ${{ secrets.REMOTE_USER }}
+      run: |
+        ssh -i key.pem $REMOTE_USER@$REMOTE_HOST << 'EOF'
+          podman load -i /tmp/idlms-app.tar
+          podman stop idlms-app || true
+          podman rm idlms-app || true
+          podman run -d --name idlms-app -p 4000:4000 \
+            --env-file /opt/idlms/.env \
+            localhost/idlms-app
+        EOF

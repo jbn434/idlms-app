@@ -43,7 +43,7 @@ jobs:
       run: |
         ssh -i key.pem -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST << 'EOF'
 # your remote deployment commands...
-EOF
+
  << 'EOF'
           podman load -i /tmp/idlms-app.tar
           podman stop idlms-app || true

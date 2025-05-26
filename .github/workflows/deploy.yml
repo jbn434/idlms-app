@@ -25,15 +25,15 @@ jobs:
       run: |
         podman save -o idlms-app.tar localhost/idlms-app
 
-    - name: Test SSH connection
-      run: |
-        echo "$SSH_PRIVATE_KEY" > key.pem
-        chmod 600 key.pem
-        ssh -i key.pem -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "echo connected successfully"
+    - name: Test SSH Connection
       env:
         SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
         REMOTE_USER: ${{ secrets.REMOTE_USER }}
+      run: |
+        echo "$SSH_PRIVATE_KEY" > key.pem
+        chmod 600 key.pem
+        ssh -i key.pem -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "echo ✅ GitHub Actions connected"
 
     - name: Copy Image to Remote Server
       env:
@@ -51,6 +51,8 @@ jobs:
         REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
         REMOTE_USER: ${{ secrets.REMOTE_USER }}
       run: |
+        echo "$SSH_PRIVATE_KEY" > key.pem
+        chmod 600 key.pem
         ssh -i key.pem -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST << 'EOF'
           podman pod create --name idlms-pod -p 4000:4000 || true
           podman volume create pgdata || true

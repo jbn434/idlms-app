@@ -1,4 +1,4 @@
-name: Deploy Node App + PostgreSQL via Podman
+name: Deploy Node App via Podman
 
 on:
   push:
@@ -12,7 +12,7 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v3
 
-    - name: Set up Podman
+    - name: Install Podman (CI Runner)
       run: |
         sudo apt update
         sudo apt install -y podman
@@ -25,16 +25,6 @@ jobs:
       run: |
         podman save -o idlms-app.tar localhost/idlms-app
 
-    - name: Test SSH Connection
-      env:
-        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-        REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
-        REMOTE_USER: ${{ secrets.REMOTE_USER }}
-      run: |
-        echo "$SSH_PRIVATE_KEY" > key.pem
-        chmod 600 key.pem
-        ssh -i key.pem -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "echo ✅ Success GitHub Actions connected"
-
     - name: Copy Image to Remote Server
       env:
         SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -45,7 +35,7 @@ jobs:
         chmod 600 key.pem
         scp -i key.pem -o StrictHostKeyChecking=no idlms-app.tar $REMOTE_USER@$REMOTE_HOST:/tmp/idlms-app.tar
 
-    - name: Load and Run Image + PostgreSQL on Remote Server
+    - name: Deploy Node App on Remote Server via Podman
       env:
         SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
@@ -54,23 +44,27 @@ jobs:
         echo "$SSH_PRIVATE_KEY" > key.pem
         chmod 600 key.pem
         ssh -i key.pem -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST << 'EOF'
+          # Install Podman if not installed
+          if ! command -v podman &> /dev/null; then
+            echo "🔧 Installing Podman..."
+            sudo apt update
+            sudo apt install -y podman
+          else
+            echo "✅ Podman already installed"
+          fi
+
+          # Create pod if not exists
           podman pod create --name idlms-pod -p 4000:4000 || true
-          podman volume create pgdata || true
 
-          podman run -d --name postgres-db --pod idlms-pod \
-            -e POSTGRES_USER=postgres \
-            -e POSTGRES_PASSWORD=yourpassword \
-            -e POSTGRES_DB=license \
-            -v pgdata:/var/lib/postgresql/data \
-            docker.io/library/postgres:15 || true
-
+          # Load new image
           podman load -i /tmp/idlms-app.tar
 
+          # Stop and remove old container if exists
           podman stop idlms-app || true
           podman rm idlms-app || true
 
+          # Run the new container
           podman run -d --name idlms-app --pod idlms-pod \
             --env-file /opt/idlms/.env \
             localhost/idlms-app
         EOF
-

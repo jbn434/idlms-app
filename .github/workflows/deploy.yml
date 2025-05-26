@@ -33,7 +33,7 @@ jobs:
       run: |
         echo "$SSH_PRIVATE_KEY" > key.pem
         chmod 600 key.pem
-        ssh -i key.pem -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "echo ✅ GitHub Actions connected"
+        ssh -i key.pem -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST "echo ✅ Success GitHub Actions connected"
 
     - name: Copy Image to Remote Server
       env:
